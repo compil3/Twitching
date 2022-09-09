@@ -34,13 +34,10 @@ if not os.path.isfile("data/DBLogin.json"):
             "dbPass": DBPass
             }
 
-    f = open("data/DBLogin.json", "w")
-    json.dump(data, f)
-    f.close()
-
-f = open("data/DBLogin.json", "r")
-data = json.load(f)
-f.close()
+    with open("data/DBLogin.json", "w") as f:
+        json.dump(data, f)
+with open("data/DBLogin.json", "r") as f:
+    data = json.load(f)
 serverAddress = data['serverAddress']
 serverPort = data['serverPort']
 localAddress = data['localAddress']
@@ -143,13 +140,9 @@ class DBConnector:
             async with self.dbPool.acquire() as connection:
                 async with connection.cursor(aiomysql.SSDictCursor) as cursor:
                     await cursor.execute(query)  # execute the query
-                    if not getOne:
-                        result = await cursor.fetchall()
-                    else:
-                        result = await cursor.fetchone()
-                    if isinstance(result, tuple):
-                        if len(result) == 0:
-                            return None
+                    result = await cursor.fetchone() if getOne else await cursor.fetchall()
+                    if isinstance(result, tuple) and len(result) == 0:
+                        return None
                     await cursor.close()
                 await connection.commit()
             self.operations += 1
@@ -181,17 +174,14 @@ https://stackoverflow.com/a/59906601
 
     def __init__(self, *arg, id=None) -> None:
         self.id = id
-        if len(arg) == 0:
+        if not arg:
             self.t = time()
             self.dt = self._dt
             self.sql = self._sql
         else:
             arg = arg[0]
-            if isinstance(arg, float) or arg == None:
-                if isinstance(arg, float):
-                    self.t = arg
-                else:
-                    self.t = time()
+            if isinstance(arg, float) or arg is None:
+                self.t = arg if isinstance(arg, float) else time()
                 self.dt = self._dt
                 self.sql = self._sql
             elif isinstance(arg, datetime):
@@ -221,7 +211,4 @@ https://stackoverflow.com/a/59906601
         return std + fract
 
     def __str__(self) -> str:
-        if self.id == None:
-            return self.sql
-        else:
-            return f'Time obj "{self.id}": {self.sql}'
+        return self.sql if self.id is None else f'Time obj "{self.id}": {self.sql}'

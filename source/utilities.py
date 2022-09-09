@@ -114,7 +114,7 @@ async def getDominantColour(bot, imageURL):
         for i in range(len(maxSorted)):
             peak = codes[maxSorted[i]]
             c = binascii.hexlify(bytearray(int(c) for c in peak)).decode('ascii')
-            if c != '00000000' and c != '00000001':
+            if c not in ['00000000', '00000001']:
                 return c
 
     async with aiohttp.ClientSession() as session:

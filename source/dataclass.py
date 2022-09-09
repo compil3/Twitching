@@ -42,10 +42,7 @@ class Bot(commands.Bot):
             o = discord.Object(id=messageID + 1)
             msg = await channel.history(limit=1, before=o).next()
 
-            if messageID == msg.id:
-                return msg
-
-            return None
+            return msg if messageID == msg.id else None
         except discord.NoMoreItems:
             # the message could not be found
             return None
