@@ -133,7 +133,7 @@ async def on_slash_command_error(ctx, ex):
         await ctx.send(f"**Error:** I am missing permissions.\n"
                        f"Please make sure i can access this channel, manage messages, embed links, and add reactions.")
     elif isinstance(ex, discord_slash.error.CheckFailure):
-        log.debug(f"Ignoring command: check failure")
+        log.debug("Ignoring command: check failure")
     elif isinstance(ex, discord.NotFound):
         logError()
         await ctx.send("Discord did not send the interaction correctly, this usually resolves after a few minutes, "

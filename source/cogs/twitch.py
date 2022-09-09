@@ -60,12 +60,7 @@ class Twitch(commands.Cog):
         for r in ctx.author.roles:
             base.value |= r.permissions.value
 
-        if base.administrator or base.manage_messages or base.manage_guild:
-            return True
-
-        if base.manage_messages:
-            return True
-        return False
+        return bool(base.administrator or base.manage_messages or base.manage_guild)
 
     async def archiveTwitchChannel(self, twitchChannel: str):
         """Checks if messages should be archived, and if so, archives them"""
@@ -83,8 +78,7 @@ class Twitch(commands.Cog):
             log.debug(f"{twitchChannel} has likely stopped streaming, archiving")
             for msgObj in json.loads(data['postedMessages']):
                 try:
-                    channel = self.bot.get_channel(int(msgObj[0]))
-                    if channel:
+                    if channel := self.bot.get_channel(int(msgObj[0])):
                         message: discord.Message = await self.bot.getMessage(int(msgObj[1]), channel)
                         if message:
                             originEmbed: discord.Embed = message.embeds[0]
@@ -145,7 +139,7 @@ class Twitch(commands.Cog):
                 if guildData['postChannel'] is not None and guildData['twitchChannel'] is not None:
                     twitchChannels: set = set(json.loads(guildData['twitchChannel']))
                     postedStreams: set = \
-                        set(json.loads(guildData['postedStreamIDs'])) if guildData[
+                            set(json.loads(guildData['postedStreamIDs'])) if guildData[
                                                                              'postedStreamIDs'] is not None else set()
 
                     # obtain all channels for this guild in one api call
@@ -190,8 +184,9 @@ class Twitch(commands.Cog):
                         # User is streaming
                         if streamData['id'] not in postedStreams:
                             log.info(f"{userData['display_name']} is live, and stream is new, posting")
-                            channel = guild.get_channel(int(guildData['postChannel']))
-                            if channel:
+                            if channel := guild.get_channel(
+                                int(guildData['postChannel'])
+                            ):
                                 thumbnailURL = streamData['thumbnail_url']
                                 thumbnailURL = thumbnailURL.replace("{width}", "1280")
                                 thumbnailURL = thumbnailURL.replace("{height}", "720")
@@ -199,10 +194,10 @@ class Twitch(commands.Cog):
 
                                 embed = discord.Embed(colour=colour)
                                 embed.description = f"{streamData['title']}\n" \
-                                                    f"[Tune In](https://twitch.tv/{userData['login']})"
+                                                        f"[Tune In](https://twitch.tv/{userData['login']})"
                                 embed.set_author(name=f"{userData['display_name']} is live",
                                                  icon_url=userData['profile_image_url'])
-                                embed.set_image(url=thumbnailURL + f"?{round(time.time())}")
+                                embed.set_image(url=f"{thumbnailURL}?{round(time.time())}")
                                 embed.url = f"https://twitch.tv/{userData['login']}"
 
                                 # if we're supposed to be mentioning a role
@@ -210,7 +205,7 @@ class Twitch(commands.Cog):
                                     mentions: dict = json.loads(guildData['mentions'])
                                     if tChannel in mentions or "all" in mentions:
                                         # user has probably set a channel to mention
-                                        role: str = mentions[tChannel] if tChannel in mentions else mentions['all']
+                                        role: str = mentions.get(tChannel, mentions['all'])
                                         role: discord.Role = await guild.get_role(int(role))
                                         if role:
                                             embed.description = f"{embed.description}\n{role.mention}"
@@ -263,27 +258,28 @@ class Twitch(commands.Cog):
         me: discord.Member = ctx.guild.get_member(self.bot.user.id)
         perms: discord.Permissions = channel.permissions_for(me)
 
-        if not perms.administrator:
-            if not perms.send_messages or \
-                    not perms.read_messages or \
-                    not perms.embed_links or \
-                    not perms.read_message_history:
-                embed = discord.Embed(title=f"Missing permissions in {channel.name}",
-                                      colour=discord.Colour.red())
-                embed.description = "Sorry I am missing perms in that channel"
-                embed.add_field(
-                    name="Send Messages", value="✅" if perms.send_messages else "❌",
-                )
-                embed.add_field(
-                    name="Read Messages", value="✅" if perms.read_messages else "❌"
-                )
-                embed.add_field(
-                    name="Embed Links", value="✅" if perms.embed_links else "❌"
-                )
-                embed.add_field(
-                    name="Read Message History", value="✅" if perms.read_message_history else "❌"
-                )
-                return await ctx.send(embed=embed)
+        if not perms.administrator and (
+            not perms.send_messages
+            or not perms.read_messages
+            or not perms.embed_links
+            or not perms.read_message_history
+        ):
+            embed = discord.Embed(title=f"Missing permissions in {channel.name}",
+                                  colour=discord.Colour.red())
+            embed.description = "Sorry I am missing perms in that channel"
+            embed.add_field(
+                name="Send Messages", value="✅" if perms.send_messages else "❌",
+            )
+            embed.add_field(
+                name="Read Messages", value="✅" if perms.read_messages else "❌"
+            )
+            embed.add_field(
+                name="Embed Links", value="✅" if perms.embed_links else "❌"
+            )
+            embed.add_field(
+                name="Read Message History", value="✅" if perms.read_message_history else "❌"
+            )
+            return await ctx.send(embed=embed)
 
         await self.bot.db.execute(
             f"INSERT INTO twitching.twitch (guildID, postChannel) "
@@ -309,8 +305,10 @@ class Twitch(commands.Cog):
             f"ON DUPLICATE KEY UPDATE postChannel = NULL"
         )
 
-        embed = discord.Embed(title=f"Stopped twitch updates",
-                              colour=discord.Colour.blurple())
+        embed = discord.Embed(
+            title="Stopped twitch updates", colour=discord.Colour.blurple()
+        )
+
         await ctx.send(embed=embed)
 
     @cog_ext.cog_subcommand(base="twitch", subcommand_group="streamer", name="add",
@@ -356,7 +354,10 @@ class Twitch(commands.Cog):
             getOne=True
         )
         try:
-            existingStreamers = set() if not dbData else set(json.loads(dbData['twitchChannel']))
+            existingStreamers = (
+                set(json.loads(dbData['twitchChannel'])) if dbData else set()
+            )
+
         except Exception as e:
             log.error(e)
             existingStreamers = set()
@@ -416,7 +417,10 @@ class Twitch(commands.Cog):
             getOne=True
         )
         try:
-            existingStreamers = set() if not dbData else set(json.loads(dbData['twitchChannel']))
+            existingStreamers = (
+                set(json.loads(dbData['twitchChannel'])) if dbData else set()
+            )
+
         except Exception as e:
             log.error(e)
             existingStreamers = set()
@@ -439,7 +443,6 @@ class Twitch(commands.Cog):
         if not self.check_perms(ctx):
             return await ctx.send("Sorry you need manage_messages to use this command", hidden=True)
         try:
-            embeds = []
             data = await self.bot.db.execute(
                 f"SELECT twitchChannel FROM twitching.twitch WHERE guildID = '{ctx.guild_id}'",
                 getOne=True
@@ -453,6 +456,7 @@ class Twitch(commands.Cog):
                         user_ids=streamers))
                 streamerData = streamerData
                 streamerData = sorted(streamerData['data'], key=lambda k: k['login'])
+                embeds = []
                 for sData in streamerData:
                     embed = discord.Embed(title=sData['display_name'])
                     embed.colour = await utilities.getDominantColour(self.bot, sData['profile_image_url'])
